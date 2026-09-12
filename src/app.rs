@@ -196,12 +196,22 @@ pub enum BucketRow {
     User(usize),
 }
 
+/// How to dispose of the playing file when deleting the current track.
+#[derive(Clone, Copy)]
+enum DeleteMode {
+    /// Permanent unlink (UI `X` after confirm).
+    Permanent,
+    /// Move to the system trash (`orbit --remote delete-current`).
+    Trash,
+}
+
 /// A pending destructive action awaiting confirmation.
 #[derive(Clone)]
 pub enum ConfirmAction {
     DeleteBucket(usize),
     ClearQueue,
     RemoveFolder(usize),
+    DeletePlayingFile,
 }
 
 #[derive(Clone)]
@@ -385,6 +395,9 @@ pub struct App {
 
     /// OS media controls (media keys + Now Playing), if available.
     remote: Option<crate::remote::Remote>,
+
+    /// Local control socket for `orbit --remote …`.
+    ctl: Option<crate::ipc::CtlServer>,
 }
 
 impl App {
@@ -468,6 +481,7 @@ impl App {
             from_settings: false,
             lyrics: None,
             remote: crate::remote::Remote::new(),
+            ctl: crate::ipc::CtlServer::bind(),
         };
 
         app.recompute_smart();
@@ -909,6 +923,8 @@ impl App {
 
         // Apply any OS media-control commands (media keys / Now Playing).
         self.process_remote();
+        // Apply any `orbit --remote` control-socket commands.
+        self.process_ctl();
     }
 
     /// The output device stalled (likely changed). Reopen it and resume.
@@ -1026,6 +1042,31 @@ impl App {
                 SeekForward => self.engine.seek_relative(5),
                 SeekBackward => self.engine.seek_relative(-5),
             }
+        }
+    }
+
+    /// Apply queued `orbit --remote` control-socket commands.
+    fn process_ctl(&mut self) {
+        let reqs = match &self.ctl {
+            Some(c) => c.poll(),
+            None => return,
+        };
+        for req in reqs {
+            let reply = match req.cmd {
+                crate::ipc::CtlCmd::DeleteCurrent => {
+                    match self.delete_playing_file(DeleteMode::Trash) {
+                        Ok(()) => crate::ipc::CtlReply::Ok,
+                        Err(e) => crate::ipc::CtlReply::Err(e),
+                    }
+                }
+                crate::ipc::CtlCmd::NotifyNowPlaying => {
+                    match self.notify_now_playing() {
+                        Ok(()) => crate::ipc::CtlReply::Ok,
+                        Err(e) => crate::ipc::CtlReply::Err(e),
+                    }
+                }
+            };
+            let _ = req.reply.send(reply);
         }
     }
 
@@ -1158,7 +1199,7 @@ impl App {
         }
     }
 
-    /// Enter on a library row: descend folders, go up via "..", or play a track.
+    /// Enter on a library row: descend folders, go up via "..", or play from here.
     fn activate_library(&mut self) {
         let Some(row) = self.lib_state.selected() else {
             return;
@@ -1166,18 +1207,13 @@ impl App {
         enum Act {
             Up,
             Enter(PathBuf),
-            Play(Track),
+            PlayFrom(usize),
             None,
         }
         let act = match self.library.entry_at(row) {
             Some(LibEntry::Parent) => Act::Up,
             Some(LibEntry::Folder { path, .. }) => Act::Enter(path.clone()),
-            Some(LibEntry::Track(i)) => self
-                .library
-                .track(*i)
-                .cloned()
-                .map(Act::Play)
-                .unwrap_or(Act::None),
+            Some(LibEntry::Track(_)) => Act::PlayFrom(row),
             None => Act::None,
         };
         match act {
@@ -1192,7 +1228,7 @@ impl App {
                     .select(if self.library.entries_len() > 0 { Some(0) } else { None });
                 self.refresh_folder_radio();
             }
-            Act::Play(track) => self.enqueue_and_play(track),
+            Act::PlayFrom(row) => self.play_from_library_row(row),
             Act::None => {}
         }
     }
@@ -1248,6 +1284,19 @@ impl App {
             "the library".to_string()
         };
         self.set_status(format!("Dumped {count} tracks from {scope} into the queue."));
+    }
+
+    /// Replace the queue with the selected library track and all following
+    /// tracks in the current view (displayed order), then start playback.
+    fn play_from_library_row(&mut self, row: usize) {
+        let tracks = self.library.tracks_from_row(row);
+        if tracks.is_empty() {
+            return;
+        }
+        self.queue.clear();
+        self.queue.extend(tracks);
+        self.queue.jump_to(0);
+        self.play_current_in_queue();
     }
 
     /// Append one track to the queue and start playing it immediately.
@@ -1464,6 +1513,121 @@ impl App {
         self.set_status("Queue cleared.");
     }
 
+    /// Confirm permanently deleting the currently playing file from disk.
+    fn request_delete_playing_file(&mut self) {
+        let Some(track) = &self.now_playing else {
+            self.set_status("Nothing playing.");
+            return;
+        };
+        let name = track
+            .path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| track.path.display().to_string());
+        self.confirm(
+            format!("Delete \"{name}\" from disk? [y/N]"),
+            ConfirmAction::DeletePlayingFile,
+        );
+    }
+
+    /// UI confirm handler — permanent delete, same as before.
+    fn do_delete_playing_file(&mut self) {
+        let _ = self.delete_playing_file(DeleteMode::Permanent);
+    }
+
+    /// Show a desktop notification for the currently playing track.
+    fn notify_now_playing(&self) -> Result<(), String> {
+        let Some(track) = &self.now_playing else {
+            return Ok(());
+        };
+        let body = if self.engine.is_paused() {
+            format!("{} (paused)", track.artist_title())
+        } else {
+            track.artist_title()
+        };
+        let subtitle = track.album.trim();
+        let subtitle = if subtitle.is_empty() {
+            None
+        } else {
+            Some(subtitle)
+        };
+        crate::platform::show_notification("Orbit", &body, subtitle)
+    }
+
+    /// Shared delete-current action used by `X` (permanent) and
+    /// `orbit --remote delete-current` (trash, no confirm).
+    ///
+    /// Returns `Ok(())` when nothing was playing or the delete finished.
+    /// Returns `Err` on a real failure (file could not be removed).
+    fn delete_playing_file(&mut self, mode: DeleteMode) -> Result<(), String> {
+        let Some(track) = self.now_playing.clone() else {
+            return Ok(());
+        };
+        let path = track.path.clone();
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.display().to_string());
+
+        let next = self.queue.next_after_current().cloned();
+        let current_idx = self.queue.current_index();
+
+        // Release the file handle so the OS will allow the delete/trash.
+        self.engine.stop();
+        self.now_playing = None;
+        self.expect_playing = false;
+        self.update_media();
+        self.update_remote();
+
+        let remove_result = match mode {
+            DeleteMode::Permanent => std::fs::remove_file(&path).map_err(|e| e.to_string()),
+            DeleteMode::Trash => trash::delete(&path).map_err(|e| e.to_string()),
+        };
+
+        if let Err(e) = remove_result {
+            if let Some(idx) = current_idx {
+                self.queue.jump_to(idx);
+                self.play_current_in_queue();
+            }
+            let msg = format!("Couldn't delete \"{name}\": {e}");
+            self.set_error(msg.clone());
+            return Err(msg);
+        }
+
+        if let Some(idx) = current_idx {
+            self.queue.remove(idx);
+        }
+        self.library.remove_by_path(&path);
+        self.recompute_smart();
+
+        let lib_len = self.library.entries_len();
+        if lib_len == 0 {
+            self.lib_state.select(None);
+        } else if let Some(sel) = self.lib_state.selected() {
+            self.lib_state.select(Some(sel.min(lib_len - 1)));
+        }
+
+        let qlen = self.queue.len();
+        if qlen == 0 {
+            self.queue_state.select(None);
+        } else if let Some(sel) = self.queue_state.selected() {
+            self.queue_state.select(Some(sel.min(qlen - 1)));
+        }
+
+        let verb = match mode {
+            DeleteMode::Permanent => "Deleted",
+            DeleteMode::Trash => "Trashed",
+        };
+        if let Some(next) = next {
+            if let Some(idx) = self.queue.items.iter().position(|t| t.path == next.path) {
+                self.queue.jump_to(idx);
+                self.play_current_in_queue();
+            }
+        }
+        self.set_status(format!("{verb} \"{name}\"."));
+        Ok(())
+    }
+
     // -- theme picker ------------------------------------------------------
 
     fn open_theme_picker(&mut self) {
@@ -1531,6 +1695,7 @@ impl App {
                     ConfirmAction::DeleteBucket(i) => self.do_delete_bucket(i),
                     ConfirmAction::ClearQueue => self.clear_queue(),
                     ConfirmAction::RemoveFolder(i) => self.do_remove_root(i),
+                    ConfirmAction::DeletePlayingFile => self.do_delete_playing_file(),
                 }
             }
             KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
@@ -2262,6 +2427,7 @@ impl App {
             KeyCode::Char(',') => self.open_settings(),
             KeyCode::Char('?') => self.open_help(),
             KeyCode::Char('i') => self.mode = Mode::About,
+            KeyCode::Char('X') => self.request_delete_playing_file(),
             _ => {}
         }
     }
@@ -2375,6 +2541,7 @@ impl App {
                 Focus::Queue => self.remove_from_queue(),
                 Focus::Library => {}
             },
+            KeyCode::Char('X') => self.request_delete_playing_file(),
             KeyCode::Char('c') => self.request_clear_queue(),
             KeyCode::Char('d') => match self.focus {
                 Focus::Buckets => self.dump_selected_bucket(),

@@ -111,6 +111,11 @@ pub fn features_file() -> PathBuf {
     project_dir().join("features.json")
 }
 
+/// Unix domain socket used by `orbit --remote …` to control a running instance.
+pub fn control_socket_path() -> PathBuf {
+    project_dir().join("orbit.sock")
+}
+
 /// Default music directory guess for first-run convenience. Uses the OS's
 /// standard "Music" location (cross-platform), falling back to `~/Music`.
 pub fn default_music_dir() -> Option<PathBuf> {

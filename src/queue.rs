@@ -93,6 +93,12 @@ impl Queue {
         self.current_index().and_then(|i| self.items.get(i))
     }
 
+    /// The next track in play order after the current one (no wrap).
+    pub fn next_after_current(&self) -> Option<&Track> {
+        let idx = *self.order.get(self.order_pos + 1)?;
+        self.items.get(idx)
+    }
+
     fn rebuild_order(&mut self, keep_current: Option<usize>) {
         let n = self.items.len();
         self.order = (0..n).collect();

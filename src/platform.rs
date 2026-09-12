@@ -14,6 +14,57 @@ pub struct PlatformTuning {
     pub rebuild_window_ticks: u32,
 }
 
+/// Post a desktop notification (macOS only).
+pub fn show_notification(title: &str, body: &str, subtitle: Option<&str>) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        return macos::show_notification(title, body, subtitle);
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (title, body, subtitle);
+        Err("desktop notifications are only supported on macOS".into())
+    }
+}
+
+#[cfg(target_os = "macos")]
+mod macos {
+    use std::process::Command;
+
+    fn esc_applescript(s: &str) -> String {
+        s.replace('\\', "\\\\")
+            .replace('"', "\\\"")
+            .replace('\n', " ")
+            .replace('\r', " ")
+    }
+
+    pub fn show_notification(title: &str, body: &str, subtitle: Option<&str>) -> Result<(), String> {
+        let script = match subtitle {
+            Some(sub) => format!(
+                "display notification \"{}\" with title \"{}\" subtitle \"{}\"",
+                esc_applescript(body),
+                esc_applescript(title),
+                esc_applescript(sub),
+            ),
+            None => format!(
+                "display notification \"{}\" with title \"{}\"",
+                esc_applescript(body),
+                esc_applescript(title),
+            ),
+        };
+        let status = Command::new("osascript")
+            .arg("-e")
+            .arg(&script)
+            .status()
+            .map_err(|e| e.to_string())?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(format!("osascript failed ({status})"))
+        }
+    }
+}
+
 /// Tuning for the host platform. `tick()` runs at 20 Hz.
 pub fn tuning() -> PlatformTuning {
     PlatformTuning {

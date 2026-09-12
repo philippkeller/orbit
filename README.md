@@ -50,6 +50,35 @@ On first launch Orbit adopts your **Music** folder if it exists; press `A` to ma
 library folders and `R` to rescan. Config, buckets, and the library cache live under
 your platform data dir (`~/Library/Application Support/orbit` on macOS).
 
+### Remote control (fork)
+
+A running Orbit instance listens on a Unix domain socket
+(`~/Library/Application Support/orbit/orbit.sock` on macOS). Use this from Karabiner,
+shell scripts, or another terminal — Orbit does not need keyboard focus.
+
+```sh
+orbit --remote delete-current        # trash the playing track, play next
+orbit --remote notify-now-playing    # macOS notification for now playing
+```
+
+Restart Orbit after upgrading so the running instance picks up new remote commands.
+
+## Changes from upstream
+
+Additional behaviour on top of stock Orbit (original by Benjamin Lee):
+
+- **Play from here** — in folder browse mode, `Enter` on a track replaces the queue
+  with that track and every following track in the current view (displayed order), then
+  starts playback immediately. Upstream appended a single track instead.
+- **Delete playing file (`X`)** — permanently delete the currently playing track from
+  disk after confirmation. Removes it from the queue and library cache without a
+  rescan, then plays the next queued track (or stops cleanly).
+- **Remote CLI** — `orbit --remote …` talks to a running instance over a Unix socket.
+  - `delete-current` — move the playing file to the Trash (no confirmation), update
+    queue/library, play next.
+  - `notify-now-playing` — show a macOS desktop notification with artist, title, and
+    album (no-op when nothing is playing).
+
 ## Screenshots
 
 The three-pane overview — library, buckets, and the queue:
@@ -107,11 +136,11 @@ Ten built-in palettes — open **Settings** (`,`) → **Theme** for a live picke
 
 ## Keys
 
-**Navigate** — `Tab` panes · `↑↓`/`j k` move · `Enter` open folder / play · `⌫` up · `/` search · `g`/`G` top/bottom
+**Navigate** — `Tab` panes · `↑↓`/`j k` move · `Enter` open folder / play from here · `⌫` up · `/` search · `g`/`G` top/bottom
 
 **Playback** — `Space` pause · `n`/`p` next/prev · `←→` seek · `+`/`-` volume · `s` shuffle · `r` repeat
 
-**Buckets** — `b` new · `S` save queue · `a` add track · `o` open/edit · `m` radio (similar) · `d` dump · `x` delete/remove · `c` clear queue
+**Buckets** — `b` new · `S` save queue · `a` add track · `o` open/edit · `m` radio (similar) · `d` dump · `x` delete/remove · `X` delete playing file · `c` clear queue
 
 **Player & more** — `A` folders · `R` rescan · `D` download (yt-dlp) · `e` EQ · `E` EQ on/off · `z` zen · `v` visualizer · `,` settings · `i` about · `?` help · `q` quit
 
@@ -130,8 +159,10 @@ Ten built-in palettes — open **Settings** (`,`) → **Theme** for a live picke
   what you've been playing, and `m` starts a radio queue from the selected track.
   Settings let you scope it to your whole **library** or just the **current folder**.
 
-- **Folder browsing** — the library navigates by folder (`Enter` / `⌫`); `/` searches
-  everything; `A` opens a built-in folder picker to add or remove roots.
+- **Folder browsing** — the library navigates by folder (`Enter` / `⌫`); `Enter` on a
+  track plays from here (replaces the queue with that track and the rest of the current
+  view); `/` searches everything; `A` opens a built-in folder picker to add or remove
+  roots.
 
 - **Download** (`D`) — paste a URL, pick a download root and folder name, and Orbit
   fetches the audio as mp3 in the background via [yt-dlp](https://github.com/yt-dlp/yt-dlp)
@@ -151,7 +182,8 @@ Ten built-in palettes — open **Settings** (`,`) → **Theme** for a live picke
   footer-hints toggle.
 
 - **OS integration** — hardware media keys and the system Now Playing panel
-  (Control Center / MPRIS / SMTC).
+  (Control Center / MPRIS / SMTC). `orbit --remote notify-now-playing` posts a macOS
+  notification for the current track (handy with Karabiner or other launchers).
 
 - **Safe & resilient** — confirmation prompts before destructive actions, and
   event-driven recovery if the audio output device disappears or changes

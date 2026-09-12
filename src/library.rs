@@ -117,6 +117,30 @@ impl Library {
         self.tracks.get(idx)
     }
 
+    /// Drop a track from the in-memory library and cache by path, then refresh the view.
+    pub fn remove_by_path(&mut self, path: &Path) -> bool {
+        let before = self.tracks.len();
+        self.tracks.retain(|t| t.path != path);
+        if self.tracks.len() == before {
+            return false;
+        }
+        self.rebuild_view();
+        save_cache(&self.tracks);
+        true
+    }
+
+    /// The track at `row` and every subsequent track in the current view, in
+    /// displayed order (skips Parent/Folder rows).
+    pub fn tracks_from_row(&self, row: usize) -> Vec<Track> {
+        self.entries[row..]
+            .iter()
+            .filter_map(|e| match e {
+                LibEntry::Track(i) => self.track(*i).cloned(),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// Tracks in the current scope: filtered matches, else everything under the
     /// current folder (recursively), else the whole library.
     pub fn scoped_tracks(&self) -> Vec<Track> {

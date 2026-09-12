@@ -1,11 +1,10 @@
-//! Orbit — a local MP3 player TUI with buckets and a real graphic EQ.
-
 mod analyze;
 mod app;
 mod audio;
 mod bucket;
 mod config;
 mod download;
+mod ipc;
 mod library;
 mod media;
 mod model;
@@ -16,6 +15,8 @@ mod stats;
 mod theme;
 mod ui;
 
+use std::env;
+use std::process::ExitCode;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
@@ -27,18 +28,70 @@ use app::App;
 /// spectrum animation (~20 fps).
 const TICK: Duration = Duration::from_millis(50);
 
-fn main() -> Result<()> {
-    let mut app = App::new()?;
-
-    let mut terminal = ratatui::try_init()
-        .map_err(|e| anyhow::anyhow!("Orbit needs an interactive terminal: {e}"))?;
-    let result = run(&mut terminal, &mut app);
-    let _ = ratatui::try_restore();
-
-    result
+fn main() -> ExitCode {
+    match run_main() {
+        Ok(code) => code,
+        Err(e) => {
+            eprintln!("error: {e:#}");
+            ExitCode::from(1)
+        }
+    }
 }
 
-fn run(terminal: &mut ratatui::DefaultTerminal, app: &mut App) -> Result<()> {
+fn run_main() -> Result<ExitCode> {
+    let mut args = env::args().skip(1);
+    if let Some(flag) = args.next() {
+        if flag == "--remote" {
+            return run_remote(args.next().as_deref());
+        }
+        if flag == "--help" || flag == "-h" {
+            print_usage();
+            return Ok(ExitCode::SUCCESS);
+        }
+        eprintln!("unknown argument: {flag}");
+        print_usage();
+        return Ok(ExitCode::from(2));
+    }
+
+    let mut app = App::new()?;
+    let mut terminal = ratatui::try_init()
+        .map_err(|e| anyhow::anyhow!("Orbit needs an interactive terminal: {e}"))?;
+    let result = run_tui(&mut terminal, &mut app);
+    let _ = ratatui::try_restore();
+    result?;
+    Ok(ExitCode::SUCCESS)
+}
+
+fn run_remote(cmd: Option<&str>) -> Result<ExitCode> {
+    match cmd {
+        Some("delete-current") => {
+            ipc::send_cmd("delete-current")?;
+            Ok(ExitCode::SUCCESS)
+        }
+        Some("notify-now-playing") => {
+            ipc::send_cmd("notify-now-playing")?;
+            Ok(ExitCode::SUCCESS)
+        }
+        Some(other) => {
+            eprintln!("unknown remote command: {other}");
+            print_usage();
+            Ok(ExitCode::from(2))
+        }
+        None => {
+            eprintln!("missing remote command");
+            print_usage();
+            Ok(ExitCode::from(2))
+        }
+    }
+}
+
+fn print_usage() {
+    eprintln!(
+        "Usage:\n  orbit\n  orbit --remote delete-current\n  orbit --remote notify-now-playing\n  orbit --help"
+    );
+}
+
+fn run_tui(terminal: &mut ratatui::DefaultTerminal, app: &mut App) -> Result<()> {
     let mut last_tick = Instant::now();
 
     loop {
