@@ -69,12 +69,6 @@ impl Library {
         &self.filter
     }
 
-    /// Reset folder navigation back to the top level.
-    pub fn reset_nav(&mut self) {
-        self.cwd = None;
-        self.rebuild_view();
-    }
-
     /// Restore folder navigation and/or search filter from a saved session.
     pub fn restore_nav(&mut self, cwd: Option<PathBuf>, filter: String) {
         self.filter = filter;

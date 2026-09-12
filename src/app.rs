@@ -346,6 +346,8 @@ pub struct App {
     scan_rx: Option<Receiver<Track>>,
     pub scanning: bool,
     pub scan_count: usize,
+    /// Library folder to reapply after the startup scan (scan must not reset nav).
+    pending_session_library: Option<crate::session::SessionLibrary>,
 
     /// Active yt-dlp download (background worker).
     download_rx: Option<Receiver<crate::download::DownloadMsg>>,
@@ -459,6 +461,7 @@ impl App {
             scan_rx: None,
             scanning: false,
             scan_count: 0,
+            pending_session_library: None,
             download_rx: None,
             downloading: false,
             download_done: 0,
@@ -749,7 +752,6 @@ impl App {
         }
         self.library.tracks.clear();
         self.library.set_roots(self.config.roots.clone());
-        self.library.reset_nav();
         self.scan_count = 0;
         self.scanning = true;
         self.scan_rx = Some(library::spawn_scan(self.config.roots.clone()));
@@ -787,7 +789,15 @@ impl App {
                 self.scanning = false;
                 self.scan_rx = None;
                 self.library.finalize();
-                if self.lib_state.selected().is_none() && self.library.entries_len() > 0 {
+                if let Some(nav) = self.pending_session_library.take() {
+                    crate::session::apply_library_nav(
+                        &mut self.library,
+                        &mut self.lib_state,
+                        &nav,
+                    );
+                } else if self.lib_state.selected().is_none()
+                    && self.library.entries_len() > 0
+                {
                     self.lib_state.select(Some(0));
                 }
                 self.recompute_smart();
@@ -2610,8 +2620,9 @@ impl App {
     }
 
     fn restore_session(&mut self, session: crate::session::Session) {
-        self.library
-            .restore_nav(session.library_cwd, session.library_filter);
+        let nav = crate::session::SessionLibrary::from_session(&session);
+        self.pending_session_library = Some(nav.clone());
+        crate::session::apply_library_nav(&mut self.library, &mut self.lib_state, &nav);
 
         let tracks: Vec<Track> = session
             .queue_tracks
@@ -2621,14 +2632,6 @@ impl App {
         self.queue
             .import_state(tracks, session.queue_order, session.queue_order_pos);
         self.sync_queue_selection();
-
-        if let Some(sel) = session.library_selection {
-            if let Some(row) = crate::session::find_library_row(&self.library, &sel) {
-                self.lib_state.select(Some(row));
-            }
-        } else if self.library.entries_len() > 0 && self.lib_state.selected().is_none() {
-            self.lib_state.select(Some(0));
-        }
 
         self.focus = match session.focus {
             crate::session::SessionFocus::Library => Focus::Library,

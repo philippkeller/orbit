@@ -5,9 +5,41 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use ratatui::widgets::ListState;
+
 use crate::config;
 use crate::library::{self, LibEntry, Library};
 use crate::model::Track;
+
+/// Library navigation state saved across sessions.
+#[derive(Debug, Clone)]
+pub struct SessionLibrary {
+    pub cwd: Option<PathBuf>,
+    pub filter: String,
+    pub selection: Option<PathBuf>,
+}
+
+impl SessionLibrary {
+    pub fn from_session(session: &Session) -> Self {
+        Self {
+            cwd: session.library_cwd.clone(),
+            filter: session.library_filter.clone(),
+            selection: session.library_selection.clone(),
+        }
+    }
+}
+
+/// Restore folder/search filter and reselect the saved row by path.
+pub fn apply_library_nav(library: &mut Library, lib_state: &mut ListState, nav: &SessionLibrary) {
+    library.restore_nav(nav.cwd.clone(), nav.filter.clone());
+    if let Some(sel) = &nav.selection {
+        if let Some(row) = find_library_row(library, sel) {
+            lib_state.select(Some(row));
+        }
+    } else if library.entries_len() > 0 && lib_state.selected().is_none() {
+        lib_state.select(Some(0));
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Session {
