@@ -99,6 +99,28 @@ impl Queue {
         self.items.get(idx)
     }
 
+    /// Export queue state for session persistence.
+    pub fn export_state(&self) -> (Vec<Track>, Vec<usize>, usize) {
+        (self.items.clone(), self.order.clone(), self.order_pos)
+    }
+
+    /// Restore queue state from a saved session.
+    pub fn import_state(&mut self, items: Vec<Track>, order: Vec<usize>, order_pos: usize) {
+        self.items = items;
+        let len = self.items.len();
+        if len > 0
+            && order.len() == len
+            && order.iter().all(|&i| i < len)
+            && order_pos < order.len()
+        {
+            self.order = order;
+            self.order_pos = order_pos;
+        } else {
+            let keep = order_pos.min(len.saturating_sub(1));
+            self.rebuild_order(if len > 0 { Some(keep) } else { None });
+        }
+    }
+
     fn rebuild_order(&mut self, keep_current: Option<usize>) {
         let n = self.items.len();
         self.order = (0..n).collect();

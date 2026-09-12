@@ -116,6 +116,11 @@ pub fn control_socket_path() -> PathBuf {
     project_dir().join("orbit.sock")
 }
 
+/// Last-session snapshot (queue, playback, library folder).
+pub fn session_file() -> PathBuf {
+    project_dir().join("session.json")
+}
+
 /// Default music directory guess for first-run convenience. Uses the OS's
 /// standard "Music" location (cross-platform), falling back to `~/Music`.
 pub fn default_music_dir() -> Option<PathBuf> {

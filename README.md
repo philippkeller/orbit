@@ -82,6 +82,9 @@ Additional behaviour on top of stock Orbit (original by Benjamin Lee):
   frozen playback position and reopens the audio output automatically (~3 s),
   resuming the current track without losing the queue or UI state. If recovery
   fails, press `Space` to retry.
+- **Session restore** — quitting with `q` saves the queue, current track (and
+  position), library folder/search, and pane focus to `session.json`. The next
+  launch picks up where you left off.
 
 ## Screenshots
 

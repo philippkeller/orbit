@@ -487,6 +487,10 @@ impl App {
             ctl: crate::ipc::CtlServer::bind(),
         };
 
+        if let Some(saved) = crate::session::load() {
+            app.restore_session(saved);
+        }
+
         app.recompute_smart();
         if app.bucket_rows_len() > 0 {
             app.bucket_state.select(Some(0));
@@ -2581,7 +2585,82 @@ impl App {
         self.config.volume = self.engine.volume();
         self.save_eq();
         self.config.save().ok();
+        crate::session::save(&self.capture_session());
         self.should_quit = true;
+    }
+
+    fn capture_session(&self) -> crate::session::Session {
+        let (items, order, order_pos) = self.queue.export_state();
+        crate::session::Session {
+            library_cwd: self.library.cwd().map(|p| p.to_path_buf()),
+            library_filter: self.library.filter().to_string(),
+            library_selection: self.session_library_selection(),
+            queue_tracks: items.into_iter().map(|t| t.path).collect(),
+            queue_order: order,
+            queue_order_pos: order_pos,
+            now_playing: self.now_playing.as_ref().map(|t| t.path.clone()),
+            position_ms: self.engine.position().as_millis() as u64,
+            paused: self.now_playing.is_some() && self.engine.is_paused(),
+            focus: match self.focus {
+                Focus::Library => crate::session::SessionFocus::Library,
+                Focus::Buckets => crate::session::SessionFocus::Buckets,
+                Focus::Queue => crate::session::SessionFocus::Queue,
+            },
+        }
+    }
+
+    fn restore_session(&mut self, session: crate::session::Session) {
+        self.library
+            .restore_nav(session.library_cwd, session.library_filter);
+
+        let tracks: Vec<Track> = session
+            .queue_tracks
+            .iter()
+            .filter_map(|p| crate::session::resolve_track(p, &self.library))
+            .collect();
+        self.queue
+            .import_state(tracks, session.queue_order, session.queue_order_pos);
+        self.sync_queue_selection();
+
+        if let Some(sel) = session.library_selection {
+            if let Some(row) = crate::session::find_library_row(&self.library, &sel) {
+                self.lib_state.select(Some(row));
+            }
+        } else if self.library.entries_len() > 0 && self.lib_state.selected().is_none() {
+            self.lib_state.select(Some(0));
+        }
+
+        self.focus = match session.focus {
+            crate::session::SessionFocus::Library => Focus::Library,
+            crate::session::SessionFocus::Buckets => Focus::Buckets,
+            crate::session::SessionFocus::Queue => Focus::Queue,
+        };
+
+        if let Some(path) = session.now_playing {
+            if let Some(track) = crate::session::resolve_track(&path, &self.library) {
+                if let Some(idx) = self.queue.items.iter().position(|t| t.path == path) {
+                    self.queue.jump_to(idx);
+                    self.sync_queue_selection();
+                }
+                self.play_track(track);
+                if session.position_ms > 0 {
+                    self.engine.seek(Duration::from_millis(session.position_ms));
+                }
+                if session.paused {
+                    self.engine.toggle_pause();
+                }
+                self.update_remote();
+            }
+        }
+    }
+
+    fn session_library_selection(&self) -> Option<PathBuf> {
+        let row = self.lib_state.selected()?;
+        match self.library.entry_at(row)? {
+            LibEntry::Track(i) => self.library.track(*i).map(|t| t.path.clone()),
+            LibEntry::Folder { path, .. } => Some(path.clone()),
+            LibEntry::Parent => self.library.cwd().map(|p| p.to_path_buf()),
+        }
     }
 
     // -- accessors for the UI ---------------------------------------------

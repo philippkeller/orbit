@@ -75,6 +75,23 @@ impl Library {
         self.rebuild_view();
     }
 
+    /// Restore folder navigation and/or search filter from a saved session.
+    pub fn restore_nav(&mut self, cwd: Option<PathBuf>, filter: String) {
+        self.filter = filter;
+        if !self.filter.is_empty() {
+            self.cwd = None;
+        } else if let Some(dir) = cwd {
+            if dir.is_dir() && self.roots.iter().any(|r| dir.starts_with(r)) {
+                self.cwd = Some(dir);
+            } else {
+                self.cwd = None;
+            }
+        } else {
+            self.cwd = None;
+        }
+        self.rebuild_view();
+    }
+
     /// The folder currently being browsed (None at the top level).
     pub fn cwd(&self) -> Option<&Path> {
         self.cwd.as_deref()

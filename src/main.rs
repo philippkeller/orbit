@@ -11,6 +11,7 @@ mod model;
 mod platform;
 mod queue;
 mod remote;
+mod session;
 mod stats;
 mod theme;
 mod ui;
