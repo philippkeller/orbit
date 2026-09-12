@@ -78,6 +78,10 @@ Additional behaviour on top of stock Orbit (original by Benjamin Lee):
     queue/library, play next.
   - `notify-now-playing` — show a macOS desktop notification with artist, title, and
     album (no-op when nothing is playing).
+- **macOS sleep/wake recovery** — after closing the laptop lid, Orbit detects a
+  frozen playback position and reopens the audio output automatically (~3 s),
+  resuming the current track without losing the queue or UI state. If recovery
+  fails, press `Space` to retry.
 
 ## Screenshots
 
@@ -187,7 +191,9 @@ Ten built-in palettes — open **Settings** (`,`) → **Theme** for a live picke
 
 - **Safe & resilient** — confirmation prompts before destructive actions, and
   event-driven recovery if the audio output device disappears or changes
-  mid-song (cross-platform, with a Linux-specific fallback for silent reroutes).
+  mid-song. On macOS and Linux, a position-stall heuristic also recovers after
+  sleep/wake when the OS does not report device loss; press `Space` to retry
+  manually if auto-recovery gives up.
 
 ## License
 

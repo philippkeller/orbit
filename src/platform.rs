@@ -3,8 +3,9 @@
 /// Per-OS knobs for the device-loss recovery state machine.
 #[derive(Clone, Copy, Debug)]
 pub struct PlatformTuning {
-    /// Whether the Tier-2 position-stall heuristic runs. Linux only — elsewhere
-    /// cpal's error callback (Tier 1) is authoritative, so the heuristic is off.
+    /// Whether the Tier-2 position-stall heuristic runs. When playback should be
+    /// advancing but the position freezes (common after laptop sleep on macOS,
+    /// where cpal may not emit a device-lost event), rebuild the output device.
     pub heuristic_enabled: bool,
     /// Consecutive no-progress ticks before the heuristic declares a stall.
     pub stall_limit_ticks: u32,
@@ -68,7 +69,7 @@ mod macos {
 /// Tuning for the host platform. `tick()` runs at 20 Hz.
 pub fn tuning() -> PlatformTuning {
     PlatformTuning {
-        heuristic_enabled: cfg!(target_os = "linux"),
+        heuristic_enabled: cfg!(any(target_os = "linux", target_os = "macos")),
         stall_limit_ticks: 60,    // ~3s — generous for suspend-on-idle / XRUNs
         rebuild_cap: 3,
         rebuild_window_ticks: 20, // ~1s debounce after a rebuild
@@ -84,7 +85,9 @@ mod tests {
         let t = tuning();
         assert!(t.rebuild_cap >= 1, "must allow at least one rebuild");
         assert!(t.stall_limit_ticks > 0);
-        // The stall heuristic is Linux-only; everywhere else Tier-1 events are authoritative.
-        assert_eq!(t.heuristic_enabled, cfg!(target_os = "linux"));
+        assert_eq!(
+            t.heuristic_enabled,
+            cfg!(any(target_os = "linux", target_os = "macos"))
+        );
     }
 }

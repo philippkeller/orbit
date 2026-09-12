@@ -340,6 +340,8 @@ pub struct App {
     pub now_playing: Option<Track>,
     expect_playing: bool,
     seen_progress: bool,
+    /// Automatic recovery gave up; Space will retry reopening the output device.
+    audio_degraded: bool,
 
     scan_rx: Option<Receiver<Track>>,
     pub scanning: bool,
@@ -453,6 +455,7 @@ impl App {
             now_playing: None,
             expect_playing: false,
             seen_progress: false,
+            audio_degraded: false,
             scan_rx: None,
             scanning: false,
             scan_count: 0,
@@ -881,8 +884,8 @@ impl App {
                 audio::WatchAction::None => {}
                 audio::WatchAction::Rebuild => self.recover_audio_device(),
                 audio::WatchAction::GiveUp => {
-                    self.set_error("Output device unavailable.");
-                    self.expect_playing = false;
+                    self.audio_degraded = true;
+                    self.set_error("Output device unavailable — press Space to retry.");
                 }
             }
         }
@@ -930,17 +933,25 @@ impl App {
     /// The output device stalled (likely changed). Reopen it and resume.
     fn recover_audio_device(&mut self) {
         let resume_at = self.engine.position();
+        let was_paused = self.engine.is_paused();
         if !self.engine.rebuild_output() {
-            self.set_error("Lost the audio output device.");
-            self.expect_playing = false;
+            self.audio_degraded = true;
+            self.set_error("Lost the audio output device — press Space to retry.");
             return;
         }
         if let Some(track) = self.now_playing.clone() {
             if self.engine.play_path(&track.path).is_ok() {
                 self.engine.seek(resume_at);
+                if was_paused {
+                    self.engine.toggle_pause();
+                }
+                self.audio_degraded = false;
                 self.seen_progress = false;
                 self.update_remote();
-                self.set_status("Audio device changed — resumed playback.");
+                self.set_status("Audio output recovered — resumed playback.");
+            } else {
+                self.audio_degraded = true;
+                self.set_error("Couldn't resume playback — press Space to retry.");
             }
         }
     }
@@ -1012,6 +1023,11 @@ impl App {
 
     /// Toggle play/pause and reflect it in the OS controls.
     pub fn toggle_pause(&mut self) {
+        if self.audio_degraded && self.now_playing.is_some() {
+            self.engine.reset_recovery();
+            self.recover_audio_device();
+            return;
+        }
         self.engine.toggle_pause();
         self.update_remote();
     }

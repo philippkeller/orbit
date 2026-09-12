@@ -113,6 +113,13 @@ impl DeviceWatch {
         self.last_pos = Duration::ZERO;
     }
 
+    /// Clear recovery backoff so a manual retry (e.g. Space after sleep) can run.
+    pub fn reset_recovery(&mut self) {
+        self.stall_ticks = 0;
+        self.failed_rebuilds = 0;
+        self.cooldown = 0;
+    }
+
     /// A Tier-1 device-loss event was observed this tick.
     pub fn on_lost(&mut self) -> WatchAction {
         if self.cooldown > 0 {
@@ -674,6 +681,11 @@ impl Engine {
         self.player.set_volume(self.volume);
     }
 
+    /// Clear recovery backoff so a manual retry can run again.
+    pub fn reset_recovery(&mut self) {
+        self.watch.reset_recovery();
+    }
+
     /// Reopen the default output device (e.g. after it changed) and a fresh
     /// player. Returns false if no device could be opened.
     pub fn rebuild_output(&mut self) -> bool {
@@ -940,7 +952,16 @@ mod tests {
     }
 
     #[test]
-    fn macos_stall_never_triggers_rebuild() {
+    fn macos_stall_triggers_rebuild_when_heuristic_enabled() {
+        let mut w = DeviceWatch::new(linux_tuning()); // same policy as macOS
+        w.on_tick(ms(500), true, false);
+        assert_eq!(w.on_tick(ms(500), true, false), WatchAction::None); // stall 1
+        assert_eq!(w.on_tick(ms(500), true, false), WatchAction::None); // stall 2
+        assert_eq!(w.on_tick(ms(500), true, false), WatchAction::Rebuild); // stall 3
+    }
+
+    #[test]
+    fn macos_stall_never_triggers_rebuild_when_heuristic_disabled() {
         let mut w = DeviceWatch::new(mac_tuning()); // heuristic disabled
         w.on_tick(ms(500), true, false);
         for _ in 0..20 {
