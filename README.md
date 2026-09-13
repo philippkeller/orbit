@@ -59,6 +59,8 @@ shell scripts, or another terminal — Orbit does not need keyboard focus.
 ```sh
 orbit --remote delete-current        # trash the playing track, play next
 orbit --remote notify-now-playing    # macOS notification for now playing
+orbit --remote seek-forward          # skip +5 seconds (same as →)
+orbit --remote seek-backward         # skip −5 seconds (same as ←)
 ```
 
 Restart Orbit after upgrading so the running instance picks up new remote commands.
@@ -78,6 +80,7 @@ Additional behaviour on top of stock Orbit (original by Benjamin Lee):
     queue/library, play next.
   - `notify-now-playing` — show a macOS desktop notification with artist, title, and
     album (no-op when nothing is playing).
+  - `seek-forward` / `seek-backward` — jump ±5 seconds (same as `→` / `←` in the UI).
 - **macOS sleep/wake recovery** — after closing the laptop lid, Orbit detects a
   frozen playback position and reopens the audio output automatically (~3 s),
   resuming the current track without losing the queue or UI state. If recovery

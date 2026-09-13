@@ -11,6 +11,8 @@ use crate::config;
 pub enum CtlCmd {
     DeleteCurrent,
     NotifyNowPlaying,
+    SeekForward,
+    SeekBackward,
 }
 
 pub enum CtlReply {
@@ -122,6 +124,8 @@ mod unix {
         let cmd = match line.trim() {
             "delete-current" => CtlCmd::DeleteCurrent,
             "notify-now-playing" => CtlCmd::NotifyNowPlaying,
+            "seek-forward" => CtlCmd::SeekForward,
+            "seek-backward" => CtlCmd::SeekBackward,
             other => {
                 let mut stream = stream;
                 let _ = writeln!(

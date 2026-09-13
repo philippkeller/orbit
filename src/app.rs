@@ -1095,6 +1095,16 @@ impl App {
                         Err(e) => crate::ipc::CtlReply::Err(e),
                     }
                 }
+                crate::ipc::CtlCmd::SeekForward => {
+                    self.engine.seek_relative(5);
+                    self.update_remote();
+                    crate::ipc::CtlReply::Ok
+                }
+                crate::ipc::CtlCmd::SeekBackward => {
+                    self.engine.seek_relative(-5);
+                    self.update_remote();
+                    crate::ipc::CtlReply::Ok
+                }
             };
             let _ = req.reply.send(reply);
         }

@@ -73,6 +73,14 @@ fn run_remote(cmd: Option<&str>) -> Result<ExitCode> {
             ipc::send_cmd("notify-now-playing")?;
             Ok(ExitCode::SUCCESS)
         }
+        Some("seek-forward") => {
+            ipc::send_cmd("seek-forward")?;
+            Ok(ExitCode::SUCCESS)
+        }
+        Some("seek-backward") => {
+            ipc::send_cmd("seek-backward")?;
+            Ok(ExitCode::SUCCESS)
+        }
         Some(other) => {
             eprintln!("unknown remote command: {other}");
             print_usage();
@@ -88,7 +96,7 @@ fn run_remote(cmd: Option<&str>) -> Result<ExitCode> {
 
 fn print_usage() {
     eprintln!(
-        "Usage:\n  orbit\n  orbit --remote delete-current\n  orbit --remote notify-now-playing\n  orbit --help"
+        "Usage:\n  orbit\n  orbit --remote delete-current\n  orbit --remote notify-now-playing\n  orbit --remote seek-forward\n  orbit --remote seek-backward\n  orbit --help"
     );
 }
 
