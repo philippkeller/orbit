@@ -199,16 +199,25 @@ fn panel_block(title_icon: &str, title: &str, focused: bool) -> Block<'static> {
 }
 
 fn draw_panels(f: &mut Frame, area: Rect, app: &mut App) {
-    let cols = Layout::horizontal([
-        Constraint::Percentage(40),
-        Constraint::Percentage(28),
-        Constraint::Percentage(32),
-    ])
-    .split(area);
-
-    draw_library(f, cols[0], app);
-    draw_buckets(f, cols[1], app);
-    draw_queue(f, cols[2], app);
+    if app.config.show_buckets {
+        let cols = Layout::horizontal([
+            Constraint::Percentage(40),
+            Constraint::Percentage(28),
+            Constraint::Percentage(32),
+        ])
+        .split(area);
+        draw_library(f, cols[0], app);
+        draw_buckets(f, cols[1], app);
+        draw_queue(f, cols[2], app);
+    } else {
+        let cols = Layout::horizontal([
+            Constraint::Percentage(55),
+            Constraint::Percentage(45),
+        ])
+        .split(area);
+        draw_library(f, cols[0], app);
+        draw_queue(f, cols[1], app);
+    }
 }
 
 fn draw_library(f: &mut Frame, area: Rect, app: &mut App) {
@@ -1297,7 +1306,7 @@ fn draw_pick(f: &mut Frame, area: Rect, app: &mut App) {
 }
 
 fn draw_settings(f: &mut Frame, area: Rect, app: &mut App) {
-    let rows: [(&str, String); 6] = [
+    let rows: [(&str, String); 7] = [
         (
             "Equalizer",
             if app.eq().enabled() { "on ›" } else { "bypassed ›" }.to_string(),
@@ -1307,6 +1316,10 @@ fn draw_settings(f: &mut Frame, area: Rect, app: &mut App) {
         (
             "Footer key hints",
             if app.config.footer_hints { "on" } else { "off" }.to_string(),
+        ),
+        (
+            "Buckets pane",
+            if app.config.show_buckets { "on" } else { "off" }.to_string(),
         ),
         ("Sleep timer", app.sleep.label()),
         ("Radio scope", app.radio_scope.label().to_string()),

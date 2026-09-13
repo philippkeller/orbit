@@ -88,6 +88,8 @@ Additional behaviour on top of stock Orbit (original by Benjamin Lee):
 - **Session restore** — quitting with `q` saves the queue, current track (and
   position), library folder/search, and pane focus to `session.json`. The next
   launch picks up where you left off.
+- **Hide buckets pane** — Settings (`,`) → **Buckets pane** toggles the middle
+  column off so you get Library | Queue only. Preference is saved in config.
 
 ## Screenshots
 
@@ -188,8 +190,8 @@ Ten built-in palettes — open **Settings** (`,`) → **Theme** for a live picke
 
 - **Settings** (`,`) — one hub for the **equalizer**, the **theme** picker (ten
   palettes, live preview, saved), the zen visualizer, a **sleep timer**
-  (15/30/45/60 min or end-of-track, with a fade-out), the **radio scope**, and a
-  footer-hints toggle.
+  (15/30/45/60 min or end-of-track, with a fade-out), the **radio scope**, a
+  footer-hints toggle, and show/hide for the **buckets pane**.
 
 - **OS integration** — hardware media keys and the system Now Playing panel
   (Control Center / MPRIS / SMTC). `orbit --remote notify-now-playing` posts a macOS

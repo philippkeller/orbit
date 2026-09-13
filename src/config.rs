@@ -29,6 +29,8 @@ pub struct Config {
     pub zen_viz: usize,
     /// Show the key-hint strip in the footer.
     pub footer_hints: bool,
+    /// Show the middle Buckets pane (Library | Buckets | Queue).
+    pub show_buckets: bool,
     /// Radio recommendation scope: 0 = library, 1 = current folder.
     pub radio_scope: usize,
 }
@@ -46,6 +48,7 @@ impl Default for Config {
             palette: 0,
             zen_viz: 0,
             footer_hints: true,
+            show_buckets: true,
             radio_scope: 0,
         }
     }

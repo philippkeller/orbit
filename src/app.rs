@@ -163,6 +163,29 @@ impl Focus {
             Focus::Queue => Focus::Buckets,
         }
     }
+
+    /// Tab cycle that skips the Buckets pane when it is hidden.
+    pub fn next_visible(self, show_buckets: bool) -> Self {
+        if show_buckets {
+            self.next()
+        } else {
+            match self {
+                Focus::Library => Focus::Queue,
+                Focus::Buckets | Focus::Queue => Focus::Library,
+            }
+        }
+    }
+
+    pub fn prev_visible(self, show_buckets: bool) -> Self {
+        if show_buckets {
+            self.prev()
+        } else {
+            match self {
+                Focus::Library | Focus::Buckets => Focus::Queue,
+                Focus::Queue => Focus::Library,
+            }
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -2326,7 +2349,7 @@ impl App {
     // -- settings ----------------------------------------------------------
 
     /// Number of rows in the settings panel.
-    pub const SETTINGS_ROWS: usize = 6;
+    pub const SETTINGS_ROWS: usize = 7;
 
     fn cycle_sleep(&mut self) {
         self.engine.restore_volume(); // undo any in-progress fade
@@ -2392,8 +2415,20 @@ impl App {
                 self.config.footer_hints = !self.config.footer_hints;
                 self.config.save().ok();
             }
-            4 => self.cycle_sleep(),
-            5 => {
+            4 => {
+                self.config.show_buckets = !self.config.show_buckets;
+                self.config.save().ok();
+                if !self.config.show_buckets && self.focus == Focus::Buckets {
+                    self.focus = Focus::Library;
+                }
+                self.set_status(if self.config.show_buckets {
+                    "Buckets pane shown."
+                } else {
+                    "Buckets pane hidden."
+                });
+            }
+            5 => self.cycle_sleep(),
+            6 => {
                 self.radio_scope = self.radio_scope.next();
                 self.config.radio_scope = self.radio_scope.as_usize();
                 self.config.save().ok();
@@ -2479,8 +2514,12 @@ impl App {
         }
         match key.code {
             KeyCode::Char('q') => self.quit(),
-            KeyCode::Tab => self.focus = self.focus.next(),
-            KeyCode::BackTab => self.focus = self.focus.prev(),
+            KeyCode::Tab => {
+                self.focus = self.focus.next_visible(self.config.show_buckets);
+            }
+            KeyCode::BackTab => {
+                self.focus = self.focus.prev_visible(self.config.show_buckets);
+            }
 
             KeyCode::Up | KeyCode::Char('k') => self.move_selection(-1),
             KeyCode::Down | KeyCode::Char('j') => self.move_selection(1),
@@ -2645,7 +2684,8 @@ impl App {
 
         self.focus = match session.focus {
             crate::session::SessionFocus::Library => Focus::Library,
-            crate::session::SessionFocus::Buckets => Focus::Buckets,
+            crate::session::SessionFocus::Buckets if self.config.show_buckets => Focus::Buckets,
+            crate::session::SessionFocus::Buckets => Focus::Library,
             crate::session::SessionFocus::Queue => Focus::Queue,
         };
 
