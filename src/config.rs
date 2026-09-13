@@ -31,6 +31,10 @@ pub struct Config {
     pub footer_hints: bool,
     /// Show the middle Buckets pane (Library | Buckets | Queue).
     pub show_buckets: bool,
+    /// Enter on a library track replaces the queue with that track and the rest
+    /// of the current view (fork behaviour). When false, matches upstream:
+    /// append that one track and play it.
+    pub play_from_here: bool,
     /// Radio recommendation scope: 0 = library, 1 = current folder.
     pub radio_scope: usize,
 }
@@ -49,6 +53,7 @@ impl Default for Config {
             zen_viz: 0,
             footer_hints: true,
             show_buckets: true,
+            play_from_here: false,
             radio_scope: 0,
         }
     }

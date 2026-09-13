@@ -1172,7 +1172,7 @@ fn draw_help(f: &mut Frame, area: Rect, app: &mut App) {
         Line::from(vec![key("Tab/⇧Tab"), desc("cycle panes")]),
         Line::from(vec![key("↑↓ j k"), desc("move selection")]),
         Line::from(vec![key("g / G"), desc("top / bottom")]),
-        Line::from(vec![key("Enter"), desc("open folder / play from here / dump bucket")]),
+        Line::from(vec![key("Enter"), desc("open folder / play / dump bucket")]),
         Line::from(vec![key("⌫"), desc("up a folder (Library)")]),
         Line::from(vec![key("/"), desc("search library")]),
         Line::from(""),
@@ -1306,7 +1306,7 @@ fn draw_pick(f: &mut Frame, area: Rect, app: &mut App) {
 }
 
 fn draw_settings(f: &mut Frame, area: Rect, app: &mut App) {
-    let rows: [(&str, String); 7] = [
+    let rows: [(&str, String); 8] = [
         (
             "Equalizer",
             if app.eq().enabled() { "on ›" } else { "bypassed ›" }.to_string(),
@@ -1320,6 +1320,10 @@ fn draw_settings(f: &mut Frame, area: Rect, app: &mut App) {
         (
             "Buckets pane",
             if app.config.show_buckets { "on" } else { "off" }.to_string(),
+        ),
+        (
+            "Enter plays from here",
+            if app.config.play_from_here { "on" } else { "off" }.to_string(),
         ),
         ("Sleep timer", app.sleep.label()),
         ("Radio scope", app.radio_scope.label().to_string()),

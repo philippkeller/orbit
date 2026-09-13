@@ -69,9 +69,10 @@ Restart Orbit after upgrading so the running instance picks up new remote comman
 
 Additional behaviour on top of stock Orbit (original by Benjamin Lee):
 
-- **Play from here** — in folder browse mode, `Enter` on a track replaces the queue
-  with that track and every following track in the current view (displayed order), then
-  starts playback immediately. Upstream appended a single track instead.
+- **Play from here** — optional (Settings → **Enter plays from here**). When on,
+  `Enter` on a library track replaces the queue with that track and every following
+  track in the current view, then starts playback. Default is off (upstream:
+  append that one track and play it).
 - **Delete playing file (`X`)** — permanently delete the currently playing track from
   disk after confirmation. Removes it from the queue and library cache without a
   rescan, then plays the next queued track (or stops cleanly).
@@ -148,7 +149,7 @@ Ten built-in palettes — open **Settings** (`,`) → **Theme** for a live picke
 
 ## Keys
 
-**Navigate** — `Tab` panes · `↑↓`/`j k` move · `Enter` open folder / play from here · `⌫` up · `/` search · `g`/`G` top/bottom
+**Navigate** — `Tab` panes · `↑↓`/`j k` move · `Enter` open folder / play · `⌫` up · `/` search · `g`/`G` top/bottom
 
 **Playback** — `Space` pause · `n`/`p` next/prev · `←→` seek · `+`/`-` volume · `s` shuffle · `r` repeat
 
@@ -171,10 +172,10 @@ Ten built-in palettes — open **Settings** (`,`) → **Theme** for a live picke
   what you've been playing, and `m` starts a radio queue from the selected track.
   Settings let you scope it to your whole **library** or just the **current folder**.
 
-- **Folder browsing** — the library navigates by folder (`Enter` / `⌫`); `Enter` on a
-  track plays from here (replaces the queue with that track and the rest of the current
-  view); `/` searches everything; `A` opens a built-in folder picker to add or remove
-  roots.
+- **Folder browsing** — the library navigates by folder (`Enter` / `⌫`); `/` searches
+  everything; `A` opens a built-in folder picker to add or remove roots. Optionally
+  enable **Enter plays from here** in Settings to replace the queue with the selected
+  track and the rest of the current view.
 
 - **Download** (`D`) — paste a URL, pick a download root and folder name, and Orbit
   fetches the audio as mp3 in the background via [yt-dlp](https://github.com/yt-dlp/yt-dlp)
@@ -191,7 +192,7 @@ Ten built-in palettes — open **Settings** (`,`) → **Theme** for a live picke
 - **Settings** (`,`) — one hub for the **equalizer**, the **theme** picker (ten
   palettes, live preview, saved), the zen visualizer, a **sleep timer**
   (15/30/45/60 min or end-of-track, with a fade-out), the **radio scope**, a
-  footer-hints toggle, and show/hide for the **buckets pane**.
+  footer-hints toggle, show/hide for the **buckets pane**, and **Enter plays from here**.
 
 - **OS integration** — hardware media keys and the system Now Playing panel
   (Control Center / MPRIS / SMTC). `orbit --remote notify-now-playing` posts a macOS

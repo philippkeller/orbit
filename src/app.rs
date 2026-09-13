@@ -1262,7 +1262,7 @@ impl App {
         }
     }
 
-    /// Enter on a library row: descend folders, go up via "..", or play from here.
+    /// Enter on a library row: descend folders, go up via "..", or play a track.
     fn activate_library(&mut self) {
         let Some(row) = self.lib_state.selected() else {
             return;
@@ -1270,13 +1270,13 @@ impl App {
         enum Act {
             Up,
             Enter(PathBuf),
-            PlayFrom(usize),
+            PlayRow(usize),
             None,
         }
         let act = match self.library.entry_at(row) {
             Some(LibEntry::Parent) => Act::Up,
             Some(LibEntry::Folder { path, .. }) => Act::Enter(path.clone()),
-            Some(LibEntry::Track(_)) => Act::PlayFrom(row),
+            Some(LibEntry::Track(_)) => Act::PlayRow(row),
             None => Act::None,
         };
         match act {
@@ -1291,7 +1291,15 @@ impl App {
                     .select(if self.library.entries_len() > 0 { Some(0) } else { None });
                 self.refresh_folder_radio();
             }
-            Act::PlayFrom(row) => self.play_from_library_row(row),
+            Act::PlayRow(row) => {
+                if self.config.play_from_here {
+                    self.play_from_library_row(row);
+                } else if let Some(LibEntry::Track(i)) = self.library.entry_at(row) {
+                    if let Some(track) = self.library.track(*i).cloned() {
+                        self.enqueue_and_play(track);
+                    }
+                }
+            }
             Act::None => {}
         }
     }
@@ -2349,7 +2357,7 @@ impl App {
     // -- settings ----------------------------------------------------------
 
     /// Number of rows in the settings panel.
-    pub const SETTINGS_ROWS: usize = 7;
+    pub const SETTINGS_ROWS: usize = 8;
 
     fn cycle_sleep(&mut self) {
         self.engine.restore_volume(); // undo any in-progress fade
@@ -2427,8 +2435,17 @@ impl App {
                     "Buckets pane hidden."
                 });
             }
-            5 => self.cycle_sleep(),
-            6 => {
+            5 => {
+                self.config.play_from_here = !self.config.play_from_here;
+                self.config.save().ok();
+                self.set_status(if self.config.play_from_here {
+                    "Enter plays from here (replaces queue)."
+                } else {
+                    "Enter appends one track (upstream)."
+                });
+            }
+            6 => self.cycle_sleep(),
+            7 => {
                 self.radio_scope = self.radio_scope.next();
                 self.config.radio_scope = self.radio_scope.as_usize();
                 self.config.save().ok();
